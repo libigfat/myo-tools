@@ -1,4 +1,4 @@
-# myo-tools(硕士毕业论文)
+# myo-tools
 
 ### 使用Myo手环实时采集表面肌电信号
 
