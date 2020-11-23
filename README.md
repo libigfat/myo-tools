@@ -13,7 +13,8 @@
 采集的数据形式为(a,b,c,d)
 
 a是总共采集了多少轮手部动作，b是第几种手部动作，c是采样点个数，d是第几个通道。
-
+### 依赖库
+pip install -r requirements
 ### 特别感谢
 
 特别感谢Myo手环社区的Niklas Rosenstein开源了一个Myo-Python库，它可以将Myo手环与电脑连接，库地址https://github.com/NiklasRosenstein/myo-python

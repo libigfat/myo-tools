@@ -1,7 +1,8 @@
 import scipy.io as sio
 import numpy as np
-import tensorflow as tf
-import os
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 
 class ArtificialNeuralNetwork():
@@ -13,11 +14,11 @@ class ArtificialNeuralNetwork():
         self.num_epochs = num_epochs
 
     def model(self, input_size, output_size):
-        x = tf.placeholder(tf.float32, shape=[None, input_size], name='x')
-        y = tf.placeholder(tf.float32, shape=[None, output_size])
-        shadow = tf.layers.dense(x, 50, activation=tf.nn.sigmoid)
-        output = tf.layers.dense(shadow, output_size)
-        return x, y, output
+        inputs = Input(shape=(input_size))
+        x = Dense(50, activation='sigmoid')(inputs)
+        outputs = Dense(output_size, activation='sigmoid')(x)
+        model = Model(inputs=inputs, outputs=outputs)
+        return model
 
     def convert_to_one_hot(self, Y):
         C = np.max(Y) + 1  # Y:原始手势标签，C：手势个数，eye：单位对角矩阵
@@ -53,75 +54,16 @@ class ArtificialNeuralNetwork():
         print(lo_label.shape)
         return lo_data, lo_label
 
-    def random_data(self, data, label):
-        permutation = np.random.permutation(len(data))
-        random_data = data[permutation]
-        random_label = label[permutation]
-        tvt_num = int(self.tvt * len(data))
-        train_data = random_data[:tvt_num]
-        train_label = random_label[:tvt_num]
-        test_data = random_data[tvt_num:]
-        test_label = random_label[tvt_num:]
-        return train_data, train_label, test_data, test_label
-
-    def random_mini_batches(self, X, Y, mini_batch_size):
-        m = X.shape[0]
-        mini_batches = []
-        permutation = list(np.random.permutation(m))
-        shuffled_X = X[permutation]
-        shuffled_Y = Y[permutation]
-        num_complete_minibatches = int(m / mini_batch_size)
-        for k in range(0, num_complete_minibatches):
-            mini_batch_X = shuffled_X[k * mini_batch_size: k * (mini_batch_size + 1)]
-            mini_batch_Y = shuffled_Y[k * mini_batch_size: k * (mini_batch_size + 1)]
-            mini_batch = (mini_batch_X, mini_batch_Y)
-            mini_batches.append(mini_batch)
-        if m % mini_batch_size != 0:
-            mini_batch_X = shuffled_X[num_complete_minibatches * mini_batch_size:]
-            mini_batch_Y = shuffled_Y[num_complete_minibatches * mini_batch_size:]
-            mini_batch = (mini_batch_X, mini_batch_Y)
-            mini_batches.append(mini_batch)
-
-        return mini_batches
-
     def ann_data(self, data, label):
-        train_data, train_label, test_data, test_label = self.random_data(data, label)
-        save_path = './model/ann/'
-        input_size = train_data.shape[1]
-        output_size = train_label.shape[1]
-        x, y, output = self.model(input_size, output_size)
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=output, labels=y))
-        optimizer = tf.train.RMSPropOptimizer(learning_rate=1e-3).minimize(loss)
-        correct_prediction = tf.equal(tf.argmax(output, axis=1), tf.argmax(y, axis=1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        predict_result = tf.argmax(output, axis=1, name='predict_result')
-        saver = tf.train.Saver()
-        with tf.Session() as sess:
-            try:
-                print('尝试恢复历史训练参数')
-                ckpt = tf.train.latest_checkpoint(save_path)
-                saver.restore(sess, ckpt)
-                print('恢复参数成功')
-            except:
-                print('未检测到历史训练参数，重新开始训练')
-                if not os.path.exists('model'):
-                    os.mkdir(os.getcwd() + '/model')
-                sess.run(tf.global_variables_initializer())
-
-            for i in range(self.num_epochs):
-                mini_batches = self.random_mini_batches(train_data, train_label, self.batch_size)
-
-                for mini_batch in mini_batches:
-                    batch_xs, batch_ys = mini_batch
-                    _ = sess.run(optimizer, feed_dict={x: batch_xs, y: batch_ys})
-
-                train_loss, train_acc = sess.run([loss, accuracy], feed_dict={x: train_data, y: train_label})
-                print('迭代次数:%d---训练准确率:%.3f---训练损失:%.3f' % (i + 1, train_acc * 100, train_loss))
-                if (i + 1) % 10 == 0:
-                    test_loss, test_acc = sess.run([loss, accuracy], feed_dict={x: test_data, y: test_label})
-                    print('迭代次数:%d---测试准确率:%.3f---测试损失:%.3f' % (i + 1, test_acc * 100, test_loss))
-                    saver.save(sess, save_path + 'ann', global_step=i + 1)
-                    print("保存参数")
+        checkpoint_filepath = 'model/ann/best'
+        model_checkpoint = ModelCheckpoint(filepath=checkpoint_filepath, save_best_only=True)
+        input_size = data.shape[1]
+        output_size = label.shape[1]
+        model = self.model(input_size, output_size)
+        model.summary()
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        model.fit(data, label, batch_size=self.batch_size, epochs=self.num_epochs, validation_split=1 - self.tvt,
+                  callbacks=[model_checkpoint])
 
     def run(self):
         lo_data, lo_label = self.load_data()
