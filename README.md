@@ -18,3 +18,5 @@ pip install -r requirements
 ### 特别感谢
 
 特别感谢Myo手环社区的Niklas Rosenstein开源了一个Myo-Python库，它可以将Myo手环与电脑连接，库地址https://github.com/NiklasRosenstein/myo-python
+
+@2021
